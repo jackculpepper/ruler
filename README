@@ -1,0 +1,154 @@
+Ruler
+=====
+
+Ruler is a toolkit for measuring distances between vectors, an operation
+required by many algorithms.
+
+For dense vectors, tools are provided for measuring sum of absolute
+differences (L1) and Hamming distances, primarily because modern processors
+have special instructions that can be used for measuring these distances
+quickly, and they are usually good surrogates for Euclidean distance.
+
+For sparse vectors, a single tool is provided. It reads in a database of
+sparse vectors stored as a list of non-zero coordinates and a "query" vector,
+which is compared to each element in the database. The L1 distance between
+the query vector and each element in the database is computed and written to
+an output file.
+
+Build
+=====
+
+Run "make all" to compile the programs.
+
+Dense vectors
+=============
+
+Run "test-dense.sh" to generate a set of test vectors, then time each of the
+sum of absolute distance and Hamming distance algorithms.  I.e.:
+
+$ bash -x test-dense.sh
++ perl gentest.pl 64000
++ ./ham_naive test_1000x64_rand.in 1000 1000
+Running 1000 loops
+105665000
+0.347653 s
++ ./ham_psadbw test_1000x64_rand.in 1000 1000
+Running 1000 loops
+105665000
+0.044802 s
++ ./ham_popcnt_gcc test_1000x64_rand.in 1000 1000
+Running 1000 loops
+105665000
+0.010064 s
++ ./ssd_naive test_1000x64_rand.in 1000 1000
+Running 1000 loops
+1013867000
+0.077668 s
++ ./sad_psadbw test_1000x64_rand.in 1000 1000
+Running 1000 loops
+203773000
+0.010926 s
++ ./sad_naive test_1000x64_rand.in 1000 1000
+Running 1000 loops
+203773000
+0.092527 s
+$ 
+
+In this example, all of the programs are run 1,000 times on 1,000 64
+dimensional vector pairs.  These vectors are generated at random using the
+Perl script "gentest.pl".
+
+Hamming distance
+----------------
+
+The first program, "ham_naive", computes the sum of Hamming distances between
+the vectors.  The answer, 105665000, is available after 0.34 seconds of CPU
+time (time required to read in the files is discounted).  "ham_naive" computes
+Hamming distance by using bit-wise XOR, then counting the 1s by AND'ing with
+1 and shifting right.
+
+"ham_psadbw" computes Hamming distances by first accumulating all the active
+bits after an XOR using an algorithm that is O(log2 N), which N is the number
+of total bits.  This accumulation step leaves sums in 8 bytes, which are then
+summed together in a single instruction, PSADBW, which is available on
+processors supporting SSE4.1.  The answer from "ham_psadbw" is available
+after only 0.0448 seconds, almost an order of magnitude faster than the naive
+method for computing Hamming distance.
+
+"ham_popcnt_gcc" computes Hamming distances using XOR and POPCNT, a special
+instruction available in SSE4.2 that simple counts the number of active bits
+in a 64-bit word.  The answer is available here in only 0.01 second, a 4x
+improvement over "ham_psadbw".
+
+Sum of absolute differences
+---------------------------
+
+"sad_psadbw" and "sad_naive" compare L1 distance computation time with and
+without the special PSADBW instruction that requires SSE4.1.  "sad_psadbw"
+achieves nearly an order of magnitude speed improvement over "sad_naive", and
+is almost as fast as computing Hamming distance.
+
+Sum of squared distances
+------------------------
+
+"ssd_naive" gives the timing required for computing an L2-like distance
+(without the square root), without any special speedup algorithm. "ssd_naive"
+is nearly an order of magnitude slower than both "sad_psadbw" and "ham_psadbw".
+
+
+Sparse vectors
+==============
+
+Run "ruler --help" to get some tips on how to call it.
+
+Run "test-sparse.sh" to run the test case.  I.e.,
+
+$ bash -x test-sparse.sh
++ ./ruler -n dbnames -w query.sign -D dbsign -t 1 -o dbout
+dbsign file length 817450
+query.sign file length 80054
+Loaded database and query in 0.001026 seconds
+Loaded 11 names in 3.1e-05 seconds
+8894 active bins in input signature
+10 signatures in db
+Computed 10 distances in 0.00241 seconds
+$ 
+
+The output is then written to the file "dbout":
+
+$ cat dbout
+0023/0023030852/71DJY5APPQL.key 0
+0023/0023050357/51SD5SQXR4L.key 48606
+0023/0023321318/41ZYGDDP04L.key 48722
+0023/0023364505/51J646CTK8L.key 48478
+0023/0023548568/51QS214NVQL.key 49506
+0023/0023557222/41QNMWZBBBL.key 48360
+0023/0023611413/21VPC0VZAZL.key 50368
+0023/0023745452/41YR6DA6QFL.key 50090
+0023/0023767863/414GYDRKN7L.key 50080
+0023/0023887419/515HXHXZWKL.key 49282
+$ 
+
+In this case, the first vector in the database is identical to the query
+vector, so the distance is zero.
+
+The format of the database file is:
+
+[bytes  0- 7] 64-bit integer designating the number of sparse vectors in
+              the database
+
+[bytes  8-15] 64-bit integer designating the number of non-zero coordinates
+              in the first vector
+
+[bytes 16-23] 64-bit integer designating the number of the first non-zero
+              coordinate in the first vector
+
+[byte  24   ] value of the first non-zero coordinate in the first vector
+
+... (etc)
+
+The format of the query vector is similar.
+
+The program allows you to quickly measure one-to-many distances between sparse
+vectors, implicitly skipping over all of the coordinates with value zero.
+
