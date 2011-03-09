@@ -6,7 +6,7 @@ required by many algorithms.
 
 For dense vectors, tools are provided for measuring sum of absolute
 differences (L1) and Hamming distances, primarily because modern processors
-have special instructions that can be used for measuring these distances
+have special instructions that can be used to measure these distances
 quickly, and they are usually good surrogates for Euclidean distance.
 
 For sparse vectors, a single tool is provided. It reads in a database of
@@ -62,21 +62,21 @@ Hamming distance
 ----------------
 
 The first program, "ham_naive", computes the sum of Hamming distances between
-the vectors.  The answer, 105665000, is available after 0.34 seconds of CPU
-time (time required to read in the files is discounted).  "ham_naive" computes
-Hamming distance by using bit-wise XOR, then counting the 1s by AND'ing with
-1 and shifting right.
+the vectors.  The answer, 105665000, is available after 0.34 seconds (time
+required to read in the files is discounted).  "ham_naive" computes Hamming
+distance by using bit-wise XOR, then counting the 1s by AND'ing with 1 and
+shifting right.
 
-"ham_psadbw" computes Hamming distances by first accumulating all the active
-bits after an XOR using an algorithm that is O(log2 N), which N is the number
-of total bits.  This accumulation step leaves sums in 8 bytes, which are then
+"ham_psadbw" computes Hamming distances by accumulating all the active bits
+after an XOR using an algorithm that is O(log2 N), where N is the number of
+total bits.  This accumulation step leaves sums in 8 bytes, which are then
 summed together in a single instruction, PSADBW, which is available on
 processors supporting SSE4.1.  The answer from "ham_psadbw" is available
 after only 0.0448 seconds, almost an order of magnitude faster than the naive
 method for computing Hamming distance.
 
 "ham_popcnt_gcc" computes Hamming distances using XOR and POPCNT, a special
-instruction available in SSE4.2 that simple counts the number of active bits
+instruction available in SSE4.2 that simply counts the number of active bits
 in a 64-bit word.  The answer is available here in only 0.01 second, a 4x
 improvement over "ham_psadbw".
 
